@@ -28,9 +28,9 @@ public class ItemSelector<T>
     }
 
     // Initial setup.
-    protected readonly IList<T> Items;
-    private readonly   Flags    _flags;
-    private readonly   byte     _numButtons;
+    public           IList<T> Items;
+    private readonly Flags    _flags;
+    private readonly byte     _numButtons;
 
     // Used by Filter
     // Indices of the currently available items after Filtered.
@@ -134,7 +134,7 @@ public class ItemSelector<T>
         => FilterDirty = true;
 
     // Selection
-    public int CurrentIdx = 0;
+    public int CurrentIdx;
     public T?  Current { get; private set; }
 
     protected void ClearCurrentSelection()
@@ -214,7 +214,9 @@ public class ItemSelector<T>
     {
         // Add a slight distance from the border so that the padding of a selectable fills the whole border.
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ImGui.GetStyle().FramePadding.X);
-        // Assume that OnDraw functions like a Selectable, if it returns true, select the value.
+
+
+// Assume that OnDraw functions like a Selectable, if it returns true, select the value.
         if (OnDraw(idx) && idx != CurrentIdx)
         {
             CurrentIdx = idx;
@@ -311,7 +313,7 @@ public class ItemSelector<T>
         if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString(), Vector2.UnitX * width))
             ImGui.OpenPopup(newNamePopupAdd);
         using var font = ImRaii.PushFont(UiBuilder.DefaultFont);
-        ImGuiUtil.HoverTooltip("Add New");
+        ImGuiUtil.HoverTooltip(AddButtonTooltip());
 
         if (!OpenNameField(newNamePopupAdd, out var newName))
             return;
@@ -381,6 +383,9 @@ public class ItemSelector<T>
 
     protected virtual string DeleteButtonTooltip()
         => "Delete Current Selection. Hold Control while clicking.";
+
+    protected virtual string AddButtonTooltip()
+        => "Add new item.";
 
     private void DrawDeleteButton(float width)
     {
