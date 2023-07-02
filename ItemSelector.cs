@@ -210,6 +210,9 @@ public class ItemSelector<T>
     protected virtual void OnDrop(object? data, int idx)
         => throw new NotImplementedException();
 
+    public virtual event EventHandler<bool> ItemAdded;
+    public virtual event EventHandler<bool> ItemDeleted;
+
     private void InternalDraw(int idx)
     {
         // Add a slight distance from the border so that the padding of a selectable fills the whole border.
@@ -322,6 +325,7 @@ public class ItemSelector<T>
         {
             TryRestoreCurrent();
             SetFilterDirty();
+            ItemAdded?.Invoke(this, true);
         }
     }
 
@@ -396,6 +400,7 @@ public class ItemSelector<T>
         {
             FilterDirty = true;
             SetCurrent(CurrentIdx > 0 ? CurrentIdx - 1 : CurrentIdx);
+            ItemDeleted?.Invoke(this, true);
         }
     }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface;
+using Dalamud.Logging;
 using ImGuiNET;
 using OtterGui.Raii;
 
@@ -18,10 +19,10 @@ public class Table<T>
     protected          bool           FilterDirty = true;
     protected          bool           SortDirty   = true;
     protected readonly ICollection<T> Items;
-    internal readonly  List<(T, int)> FilteredItems;
+    public             List<(T, int)> FilteredItems;
 
     protected readonly string      Label;
-    protected readonly Column<T>[] Headers;
+    protected      List<Column<T>> Headers;
 
     protected float ItemHeight  { get; set; }
     public    float ExtraHeight { get; set; } = 0;
@@ -52,7 +53,7 @@ public class Table<T>
         => FilteredItems.Count;
 
     public int TotalColumns
-        => Headers.Length;
+        => Headers.Count;
 
     public int VisibleColumns { get; private set; }
 
@@ -60,9 +61,9 @@ public class Table<T>
     {
         Label          = label;
         Items          = items;
-        Headers        = headers;
+        Headers        = headers.ToList();
         FilteredItems  = new List<(T, int)>(Items.Count);
-        VisibleColumns = Headers.Length;
+        VisibleColumns = Headers.Count();
     }
 
     public void Draw(float itemHeight)
@@ -95,7 +96,7 @@ public class Table<T>
 
             SortIdx = sortSpecs.Specs.ColumnIndex;
 
-            if (Headers.Length <= SortIdx)
+            if (Headers.Count <= SortIdx)
                 SortIdx = 0;
 
             if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
@@ -108,7 +109,7 @@ public class Table<T>
             sortSpecs.SpecsDirty = false;
     }
 
-    private void UpdateFilter()
+    public void UpdateFilter()
     {
         if (!FilterDirty)
             return;
@@ -118,7 +119,9 @@ public class Table<T>
         foreach (var item in Items)
         {
             if (WouldBeVisible(item))
+            {
                 FilteredItems.Add((item, idx));
+            }
             idx++;
         }
 
@@ -142,7 +145,7 @@ public class Table<T>
 
     private void DrawTableInternal()
     {
-        using var table = ImRaii.Table("Table", Headers.Length, Flags,
+        using var table = ImRaii.Table("Table", Headers.Count, Flags,
             ImGui.GetContentRegionAvail() - ExtraHeight * Vector2.UnitY * ImGuiHelpers.GlobalScale);
         if (!table)
             return;

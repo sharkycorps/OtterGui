@@ -45,6 +45,7 @@ public static class ImGuiClip
         {
             for (var actualRow = clipper.DisplayStart; actualRow < clipper.DisplayEnd; actualRow++)
             {
+                
                 if (actualRow >= data.Count)
                     return;
 
