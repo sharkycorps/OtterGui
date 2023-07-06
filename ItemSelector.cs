@@ -135,7 +135,7 @@ public class ItemSelector<T>
 
     // Selection
     public int CurrentIdx;
-    public T?  Current { get; private set; }
+    public T?  Current { get; set; }
 
     protected void ClearCurrentSelection()
     {
