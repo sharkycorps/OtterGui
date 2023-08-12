@@ -215,11 +215,12 @@ public class ItemSelector<T>
 
     private void InternalDraw(int idx)
     {
+
         // Add a slight distance from the border so that the padding of a selectable fills the whole border.
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ImGui.GetStyle().FramePadding.X);
 
 
-// Assume that OnDraw functions like a Selectable, if it returns true, select the value.
+        // Assume that OnDraw functions like a Selectable, if it returns true, select the value.
         if (OnDraw(idx) && idx != CurrentIdx)
         {
             CurrentIdx = idx;
@@ -409,6 +410,7 @@ public class ItemSelector<T>
         if (_numButtons == 0)
             return;
 
+        ImGui.Dummy(new Vector2(0, 15f));
         using var font        = ImRaii.PushFont(UiBuilder.IconFont);
         var       buttonWidth = width / _numButtons;
 
@@ -444,7 +446,7 @@ public class ItemSelector<T>
         using var id    = ImRaii.PushId(Label);
         using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         using var group = ImRaii.Group();
-        using var child = ImRaii.Child(string.Empty, new Vector2(width, -ImGui.GetFrameHeight()), true);
+        using var child = ImRaii.Child(string.Empty, new Vector2(width, -ImGui.GetFrameHeight() -15f), true);
         if (!child)
             return;
 
@@ -452,7 +454,7 @@ public class ItemSelector<T>
 
         DrawFilter(width);
         UpdateFilteredItems();
-        ImGuiClip.ClippedDraw(FilteredItems, InternalDraw, ImGui.GetTextLineHeightWithSpacing());
+        ImGuiClip.ClippedDraw(FilteredItems, InternalDraw, ImGui.GetTextLineHeightWithSpacing() + 0.25f);
         style.Push(ImGuiStyleVar.FrameRounding, 0)
             .Push(ImGuiStyleVar.WindowPadding, Vector2.Zero)
             .Push(ImGuiStyleVar.ItemSpacing,   Vector2.Zero);
