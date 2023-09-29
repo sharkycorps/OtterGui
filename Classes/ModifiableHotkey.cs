@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.ClientState.Keys;
+using Dalamud.Plugin.Services;
 using Newtonsoft.Json;
 
 namespace OtterGui.Classes;
@@ -102,6 +103,6 @@ public struct ModifiableHotkey : IEquatable<ModifiableHotkey>
 
 public static class VirtualKeyExtensions
 {
-    public static bool IsPressed(this VirtualKey key, KeyState state)
+    public static bool IsPressed(this VirtualKey key, IKeyState state)
         => state[key];
 }

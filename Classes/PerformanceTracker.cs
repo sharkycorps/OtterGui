@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Dalamud.Game;
 using Dalamud.Interface;
+using Dalamud.Interface.Utility;
+using Dalamud.Plugin.Services;
 using ImGuiNET;
 using OtterGui.Raii;
 
@@ -13,7 +15,7 @@ namespace OtterGui.Classes;
 
 public class PerformanceTracker<T> : IDisposable where T : unmanaged, Enum
 {
-    private readonly Framework _framework;
+    private readonly IFramework _framework;
     public           bool      Enabled     { get; private set; }
     public           long      TotalFrames { get; private set; }
 
@@ -98,7 +100,7 @@ public class PerformanceTracker<T> : IDisposable where T : unmanaged, Enum
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-    private void OnFramework(Framework _)
+    private void OnFramework(IFramework _)
     {
         foreach (ref var monitor in _monitors.AsSpan())
             monitor.Update();
@@ -107,7 +109,7 @@ public class PerformanceTracker<T> : IDisposable where T : unmanaged, Enum
         _monitors.Last()!.Stopwatch.Value!.Start();
     }
 
-    public PerformanceTracker(Framework framework)
+    public PerformanceTracker(IFramework framework)
         => _framework = framework;
 
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.ClientState.Keys;
+using Dalamud.Plugin.Services;
 using ImGuiNET;
 using OtterGui.Filesystem;
 
@@ -9,7 +10,7 @@ namespace OtterGui.FileSystem.Selector;
 
 public partial class FileSystemSelector<T, TStateStorage>
 {
-    private readonly KeyState _keyState;
+    private readonly IKeyState _keyState;
 
     // Some actions should not be done during due to changed collections
     // or dependency on ImGui IDs.

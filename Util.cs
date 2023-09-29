@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.Internal;
 using ImGuiNET;
 using OtterGui.Raii;
 
@@ -371,13 +372,13 @@ public static partial class ImGuiUtil
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-    public static void HoverIcon(ImGuiScene.TextureWrap icon, Vector2 iconSize)
+    public static void HoverIcon(IDalamudTextureWrap icon, Vector2 iconSize)
     {
         ImGui.Image(icon.ImGuiHandle, iconSize);
         HoverIconTooltip(icon, iconSize);
     }
 
-    public static void HoverIconTooltip(ImGuiScene.TextureWrap icon, Vector2 iconSize)
+    public static void HoverIconTooltip(IDalamudTextureWrap icon, Vector2 iconSize)
     {
         var size = new Vector2(icon.Width, icon.Height);
         if (iconSize.X > size.X || iconSize.Y > size.Y || !ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))

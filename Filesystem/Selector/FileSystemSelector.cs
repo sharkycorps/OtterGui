@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Logging;
+using Dalamud.Plugin.Services;
 using ImGuiNET;
 using OtterGui.Filesystem;
 using OtterGui.Raii;
@@ -75,7 +76,7 @@ public partial class FileSystemSelector<T, TStateStorage> where T : class where 
 
     public readonly Action<Exception> ExceptionHandler;
 
-    public FileSystemSelector(FileSystem<T> fileSystem, KeyState keyState, Action<Exception>? exceptionHandler = null, string label = "##FileSystemSelector")
+    public FileSystemSelector(FileSystem<T> fileSystem, IKeyState keyState, Action<Exception>? exceptionHandler = null, string label = "##FileSystemSelector")
     {
         FileSystem = fileSystem;
         _state     = new List<StateStruct>(FileSystem.Root.TotalDescendants);
