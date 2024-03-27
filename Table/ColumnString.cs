@@ -52,4 +52,9 @@ public class ColumnString<TItem> : Column<TItem>
     {
         ImGui.TextUnformatted(ToName(item));
     }
+
+    public virtual event EventHandler<TItem>? OnContextMenuRequest;
+
+    public void InvokeContextMenu(TItem e)
+        => OnContextMenuRequest?.Invoke(this, e);
 }
