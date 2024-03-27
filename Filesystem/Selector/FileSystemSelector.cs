@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Dalamud.Game.ClientState.Keys;
-using Dalamud.Logging;
 using Dalamud.Plugin.Services;
 using ImGuiNET;
 using OtterGui.Filesystem;
+using OtterGui.Log;
 using OtterGui.Raii;
 
 namespace OtterGui.FileSystem.Selector;
@@ -14,6 +10,8 @@ public partial class FileSystemSelector<T, TStateStorage> where T : class where 
 {
     public delegate void SelectionChangeDelegate(T? oldSelection, T? newSelection, in TStateStorage state);
 
+    protected readonly HashSet<FileSystem<T>.IPath> _selectedPaths = [];
+
     // The currently selected leaf, if any.
     protected FileSystem<T>.Leaf? SelectedLeaf;
 
@@ -21,15 +19,49 @@ public partial class FileSystemSelector<T, TStateStorage> where T : class where 
     public T? Selected
         => SelectedLeaf?.Value;
 
+    public IReadOnlySet<FileSystem<T>.IPath> SelectedPaths
+        => _selectedPaths;
+
     // Fired after the selected leaf changed.
     public event SelectionChangeDelegate? SelectionChanged;
-    private FileSystem<T>.Leaf? _jumpToSelection = null;
+    private FileSystem<T>.Leaf?           _jumpToSelection;
 
     public void ClearSelection()
-        => Select(null);
+        => Select(null, AllowMultipleSelection);
 
-    protected void Select(FileSystem<T>.Leaf? leaf, in TStateStorage storage = default)
+    public void RemovePathFromMultiSelection(FileSystem<T>.IPath path)
     {
+        _selectedPaths.Remove(path);
+        if (_selectedPaths.Count == 1 && _selectedPaths.First() is FileSystem<T>.Leaf leaf)
+            Select(leaf, true, GetState(leaf));
+    }
+
+    private void Select(FileSystem<T>.IPath? path, in TStateStorage storage, bool additional)
+    {
+        if (path == null)
+        {
+            Select(null, AllowMultipleSelection, storage);
+        }
+        else if (additional && AllowMultipleSelection)
+        {
+            if (SelectedLeaf != null && _selectedPaths.Count == 0)
+                _selectedPaths.Add(SelectedLeaf);
+            if (!_selectedPaths.Add(path))
+                RemovePathFromMultiSelection(path);
+            else
+                Select(null, false);
+        }
+        else if (path is FileSystem<T>.Leaf leaf)
+        {
+            Select(leaf, AllowMultipleSelection, storage);
+        }
+    }
+
+    protected virtual void Select(FileSystem<T>.Leaf? leaf, bool clear, in TStateStorage storage = default)
+    {
+        if (clear)
+            _selectedPaths.Clear();
+
         var oldV = SelectedLeaf?.Value;
         var newV = leaf?.Value;
         if (oldV == newV)
@@ -76,17 +108,24 @@ public partial class FileSystemSelector<T, TStateStorage> where T : class where 
 
     public readonly Action<Exception> ExceptionHandler;
 
-    public FileSystemSelector(FileSystem<T> fileSystem, IKeyState keyState, Action<Exception>? exceptionHandler = null, string label = "##FileSystemSelector")
+    public readonly bool AllowMultipleSelection;
+
+    protected readonly Logger Log;
+
+    public FileSystemSelector(FileSystem<T> fileSystem, IKeyState keyState, Logger log, Action<Exception>? exceptionHandler = null,
+        string label = "##FileSystemSelector", bool allowMultipleSelection = false)
     {
-        FileSystem = fileSystem;
-        _state     = new List<StateStruct>(FileSystem.Root.TotalDescendants);
-        _keyState  = keyState;
-        Label      = label;
+        FileSystem             = fileSystem;
+        _state                 = new List<StateStruct>(FileSystem.Root.TotalDescendants);
+        _keyState              = keyState;
+        Label                  = label;
+        AllowMultipleSelection = allowMultipleSelection;
+        Log                    = log;
 
         InitDefaultContext();
         InitDefaultButtons();
         EnableFileSystemSubscription();
-        ExceptionHandler = exceptionHandler ?? (e => PluginLog.Warning(e.ToString()));
+        ExceptionHandler = exceptionHandler ?? (e => Log.Warning(e.ToString()));
     }
 
     // Default flags to use for custom leaf nodes.
@@ -133,13 +172,11 @@ public partial class FileSystemSelector<T, TStateStorage> where T : class where 
         var leaf = FileSystem.Root.GetAllDescendants(ISortMode<T>.Lexicographical).OfType<FileSystem<T>.Leaf>()
             .FirstOrDefault(l => l.Value == value);
         if (leaf != null)
-        {
             EnqueueFsAction(() =>
             {
                 _filterDirty |= ExpandAncestors(leaf);
-                Select(leaf, GetState(leaf));
+                Select(leaf, AllowMultipleSelection, GetState(leaf));
                 _jumpToSelection = leaf;
             });
-        }
     }
 }

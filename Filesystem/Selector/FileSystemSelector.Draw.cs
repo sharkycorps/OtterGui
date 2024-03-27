@@ -1,8 +1,4 @@
-using System;
-using System.Linq;
-using System.Numerics;
 using Dalamud.Game.ClientState.Keys;
-using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using ImGuiNET;
 using OtterGui.Classes;
@@ -35,9 +31,9 @@ public partial class FileSystemSelector<T, TStateStorage>
     //     - selection.
     private (Vector2, Vector2) DrawLeaf(FileSystem<T>.Leaf leaf, in TStateStorage state)
     {
-        DrawLeafName(leaf, state, leaf == SelectedLeaf);
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            Select(leaf, state);
+        DrawLeafName(leaf, state, leaf == SelectedLeaf || SelectedPaths.Contains(leaf));
+        if(ImGui.IsItemHovered() && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+            Select(leaf, state, ImGui.GetIO().KeyCtrl);
 
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             ImGui.OpenPopup(leaf.Identifier.ToString());
@@ -140,15 +136,20 @@ public partial class FileSystemSelector<T, TStateStorage>
     //     - expanding/collapsing
     private (Vector2, Vector2) DrawFolder(FileSystem<T>.Folder folder)
     {
-        var       flags = ImGuiTreeNodeFlags.NoTreePushOnOpen | (FoldersDefaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None);
+        var flags = ImGuiTreeNodeFlags.NoTreePushOnOpen | (FoldersDefaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None);
+        if (SelectedPaths.Contains(folder))
+            flags |= ImGuiTreeNodeFlags.Selected;
         var       expandedState = GetPathState(folder);
-        using var color = ImRaii.PushColor(ImGuiCol.Text, expandedState ? ExpandedFolderColor : CollapsedFolderColor);
-        var       recurse = ImGui.TreeNodeEx((IntPtr)folder.Identifier, flags, folder.Name.Replace("%", "%%"));
+        using var color         = ImRaii.PushColor(ImGuiCol.Text, expandedState ? ExpandedFolderColor : CollapsedFolderColor);
+        var       recurse       = ImGui.TreeNodeEx((IntPtr)folder.Identifier, flags, folder.Name.Replace("%", "%%"));
 
         if (expandedState != recurse)
             AddOrRemoveDescendants(folder, recurse);
 
         color.Pop();
+
+        if (AllowMultipleSelection && ImGui.IsItemClicked(ImGuiMouseButton.Left) && ImGui.GetIO().KeyCtrl)
+            Select(folder, default, true);
 
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             ImGui.OpenPopup(folder.Identifier.ToString());
@@ -205,13 +206,13 @@ public partial class FileSystemSelector<T, TStateStorage>
         if (!_)
             return false;
 
+        ImGui.SetScrollX(0);
         _stateStorage = ImGui.GetStateStorage();
         style.Push(ImGuiStyleVar.IndentSpacing, 14f * ImGuiHelpers.GlobalScale)
             .Push(ImGuiStyleVar.ItemSpacing,  new Vector2(ImGui.GetStyle().ItemSpacing.X, ImGuiHelpers.GlobalScale))
             .Push(ImGuiStyleVar.FramePadding, new Vector2(ImGuiHelpers.GlobalScale,       ImGui.GetStyle().FramePadding.Y));
         //// Check if filters are dirty and recompute them before the draw iteration if necessary.
         ApplyFilters();
-
         if (_jumpToSelection != null)
         {
             var idx = _state.FindIndex(s => s.Path == _jumpToSelection);
@@ -352,7 +353,7 @@ public partial class FileSystemSelector<T, TStateStorage>
         if (next != null)
         {
             _lastButtonTime = DateTimeOffset.UtcNow;
-            Select(next);
+            Select(next, AllowMultipleSelection);
             var max = ImGui.GetScrollMaxY();
             if (max != 0)
             {

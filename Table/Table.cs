@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using Dalamud.Interface;
-using Dalamud.Logging;
+using Dalamud.Interface.Utility;
 using ImGuiNET;
 using OtterGui.Raii;
 
@@ -16,13 +11,13 @@ public static class Table
 
 public class Table<T>
 {
-    protected          bool           FilterDirty = true;
-    protected          bool           SortDirty   = true;
-    protected readonly ICollection<T> Items;
-    public             List<(T, int)> FilteredItems;
+    protected          bool                   FilterDirty = true;
+    protected          bool                   SortDirty   = true;
+    protected readonly IReadOnlyCollection<T> Items;
+    internal readonly  List<(T, int)>         FilteredItems;
 
     protected readonly string      Label;
-    protected      List<Column<T>> Headers;
+    protected readonly Column<T>[] Headers;
 
     protected float ItemHeight  { get; set; }
     public    float ExtraHeight { get; set; } = 0;
@@ -53,17 +48,17 @@ public class Table<T>
         => FilteredItems.Count;
 
     public int TotalColumns
-        => Headers.Count;
+        => Headers.Length;
 
     public int VisibleColumns { get; private set; }
 
-    public Table(string label, ICollection<T> items, params Column<T>[] headers)
+    public Table(string label, IReadOnlyCollection<T> items, params Column<T>[] headers)
     {
         Label          = label;
         Items          = items;
-        Headers        = headers.ToList();
+        Headers        = headers;
         FilteredItems  = new List<(T, int)>(Items.Count);
-        VisibleColumns = Headers.Count();
+        VisibleColumns = Headers.Length;
     }
 
     public void Draw(float itemHeight)
@@ -94,22 +89,22 @@ public class Table<T>
         if (!SortDirty)
             return;
 
-            SortIdx = sortSpecs.Specs.ColumnIndex;
+        SortIdx = sortSpecs.Specs.ColumnIndex;
 
-            if (Headers.Count <= SortIdx)
-                SortIdx = 0;
+        if (Headers.Length <= SortIdx)
+            SortIdx = 0;
 
-            if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
-                FilteredItems.StableSort((a, b) => Headers[SortIdx].Compare(a.Item1, b.Item1));
-            else if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
-                FilteredItems.StableSort((a, b) => Headers[SortIdx].CompareInv(a.Item1, b.Item1));
-            else
-                SortIdx = -1;
-            SortDirty            = false;
-            sortSpecs.SpecsDirty = false;
+        if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+            FilteredItems.StableSort((a, b) => Headers[SortIdx].Compare(a.Item1, b.Item1));
+        else if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
+            FilteredItems.StableSort((a, b) => Headers[SortIdx].CompareInv(a.Item1, b.Item1));
+        else
+            SortIdx = -1;
+        SortDirty            = false;
+        sortSpecs.SpecsDirty = false;
     }
 
-    public void UpdateFilter()
+    private void UpdateFilter()
     {
         if (!FilterDirty)
             return;
@@ -119,9 +114,7 @@ public class Table<T>
         foreach (var item in Items)
         {
             if (WouldBeVisible(item))
-            {
                 FilteredItems.Add((item, idx));
-            }
             idx++;
         }
 
@@ -145,7 +138,7 @@ public class Table<T>
 
     private void DrawTableInternal()
     {
-        using var table = ImRaii.Table("Table", Headers.Count, Flags,
+        using var table = ImRaii.Table("Table", Headers.Length, Flags,
             ImGui.GetContentRegionAvail() - ExtraHeight * Vector2.UnitY * ImGuiHelpers.GlobalScale);
         if (!table)
             return;

@@ -1,23 +1,14 @@
-using System;
-using System.Diagnostics;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using Serilog.Events;
 
 namespace OtterGui.Log;
 
-public readonly struct LazyString
+public readonly struct LazyString(Func<string> func)
 {
-    private readonly Func<string> _func;
-
-    public LazyString(Func<string> func)
-        => _func = func;
-
     public static explicit operator LazyString(Func<string> func)
         => new(func);
 
     public override string ToString()
-        => _func();
+        => func();
 }
 
 public class Logger
@@ -26,10 +17,13 @@ public class Logger
     private readonly string          _pluginName;
     private readonly string          _prefix;
 
+    public Serilog.ILogger MainLogger
+        => _pluginLogger;
+
     public Logger()
     {
         _pluginName   = Assembly.GetCallingAssembly().GetName().Name ?? "Unknown";
-        _pluginLogger = Serilog.Log.ForContext("SourceContext", _pluginName);
+        _pluginLogger = Serilog.Log.ForContext("Dalamud.PluginName", _pluginName);
         _prefix       = $"[{_pluginName}] ";
     }
 

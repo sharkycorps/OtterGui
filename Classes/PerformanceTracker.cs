@@ -1,11 +1,3 @@
-using System;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using Dalamud.Game;
-using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin.Services;
 using ImGuiNET;
@@ -16,8 +8,8 @@ namespace OtterGui.Classes;
 public class PerformanceTracker<T> : IDisposable where T : unmanaged, Enum
 {
     private readonly IFramework _framework;
-    public           bool      Enabled     { get; private set; }
-    public           long      TotalFrames { get; private set; }
+    public           bool       Enabled     { get; private set; }
+    public           long       TotalFrames { get; private set; }
 
     private readonly Monitor[] _monitors =
 #if PROFILING

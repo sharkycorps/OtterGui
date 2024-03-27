@@ -1,23 +1,23 @@
-using System.Collections.Generic;
-using System.Numerics;
-using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using ImGuiNET;
+using OtterGui.Log;
 using OtterGui.Raii;
 
 namespace OtterGui.Widgets;
 
-public sealed class FilterComboColors : FilterComboCache<KeyValuePair<byte, (string Name, uint Color, bool Gloss)>>
+public class FilterComboColors : FilterComboCache<KeyValuePair<byte, (string Name, uint Color, bool Gloss)>>
 {
     private readonly float        _comboWidth;
     private readonly ImRaii.Color _color = new();
     private          Vector2      _buttonSize;
-    private          uint         _currentColor = 0;
+    private          uint         _currentColor;
+    private          bool         _currentGloss;
+
     protected override int UpdateCurrentSelected(int currentSelected)
     {
-        if (CurrentSelection.Key != _currentColor)
+        if (CurrentSelection.Value.Color != _currentColor)
         {
-            CurrentSelectionIdx = Items.IndexOf(c => c.Value.Color == _currentColor );
+            CurrentSelectionIdx = Items.IndexOf(c => c.Value.Color == _currentColor);
             CurrentSelection    = CurrentSelectionIdx >= 0 ? Items[CurrentSelectionIdx] : default;
             return base.UpdateCurrentSelected(CurrentSelectionIdx);
         }
@@ -25,9 +25,14 @@ public sealed class FilterComboColors : FilterComboCache<KeyValuePair<byte, (str
         return currentSelected;
     }
 
-    public FilterComboColors(float comboWidth, IEnumerable<KeyValuePair<byte, (string Name, uint Color, bool Gloss)>> colors)
-        : base(colors)
-        => _comboWidth = comboWidth;
+    public FilterComboColors(float comboWidth, MouseWheelType allowMouseWheel,
+        Func<IReadOnlyList<KeyValuePair<byte, (string Name, uint Color, bool Gloss)>>> colors,
+        Logger log)
+        : base(colors, allowMouseWheel, log)
+    {
+        _comboWidth   = comboWidth;
+        SearchByParts = true;
+    }
 
     protected override float GetFilterWidth()
     {
@@ -54,26 +59,57 @@ public sealed class FilterComboColors : FilterComboCache<KeyValuePair<byte, (str
     {
         var (_, (name, color, gloss)) = Items[globalIdx];
         // Push the stain color to type and if it is too bright, turn the text color black.
-        var intensity = ImGuiUtil.ColorIntensity(color);
+        var contrastColor = ImGuiUtil.ContrastColorBw(color);
         using var colors = ImRaii.PushColor(ImGuiCol.Button, color, color != 0)
-            .Push(ImGuiCol.Text,   0xFF101010, intensity > 127)
-            .Push(ImGuiCol.Border, 0xFF2020D0, selected);
-        using var style = ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, 2f * ImGuiHelpers.GlobalScale, selected);
-        var       ret   = ImGui.Button(name, _buttonSize);
+            .Push(ImGuiCol.Text, contrastColor);
+        var ret = ImGui.Button(name, _buttonSize);
+        if (selected)
+        {
+            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), 0xFF2020D0, 0, ImDrawFlags.None,
+                ImGuiHelpers.GlobalScale);
+            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin() + new Vector2(ImGuiHelpers.GlobalScale),
+                ImGui.GetItemRectMax() - new Vector2(ImGuiHelpers.GlobalScale), contrastColor, 0, ImDrawFlags.None, ImGuiHelpers.GlobalScale);
+        }
 
         if (gloss)
-            ImGui.GetForegroundDrawList().AddRectFilledMultiColor(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), 0x50FFFFFF, 0x50000000,
+            ImGui.GetWindowDrawList().AddRectFilledMultiColor(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), 0x50FFFFFF, 0x50000000,
                 0x50FFFFFF, 0x50000000);
 
         return ret;
     }
 
-    public bool Draw(string label, uint color, string name, bool found)
+    public virtual bool Draw(string label, uint color, string name, bool found, bool gloss, float previewWidth,
+        MouseWheelType mouseWheel = MouseWheelType.Control)
     {
         _currentColor = color;
-        _color.Push(ImGuiCol.FrameBg, color, found && color != 0);
-        var change = Draw(label, string.Empty, found ? name : string.Empty, ImGui.GetFrameHeight(), ImGui.GetFrameHeight(), ImGuiComboFlags.NoArrowButton);
-        _color.Pop();
+        _currentGloss = gloss;
+        var preview = found && ImGui.CalcTextSize(name).X <= previewWidth ? name : string.Empty;
+
+        AllowMouseWheel = mouseWheel;
+        _color.Push(ImGuiCol.FrameBg, color, found && color != 0)
+            .Push(ImGuiCol.Text, ImGuiUtil.ContrastColorBw(color), preview.Length > 0);
+        var change = Draw(label, preview, found ? name : string.Empty, previewWidth, ImGui.GetFrameHeight(), ImGuiComboFlags.NoArrowButton);
         return change;
     }
+
+    protected override void PostCombo(float previewWidth)
+    {
+        _color.Dispose();
+        if (_currentGloss)
+        {
+            var min = ImGui.GetItemRectMin();
+            ImGui.GetWindowDrawList().AddRectFilledMultiColor(min, new Vector2(min.X + previewWidth, ImGui.GetItemRectMax().Y), 0x50FFFFFF,
+                0x50000000, 0x50FFFFFF, 0x50000000);
+        }
+    }
+
+    protected override void OnMouseWheel(string preview, ref int index, int steps)
+    {
+        UpdateCurrentSelected(0);
+        base.OnMouseWheel(preview, ref index, steps);
+    }
+
+    public bool Draw(string label, uint color, string name, bool found, bool gloss,
+        MouseWheelType mouseWheel = MouseWheelType.Control)
+        => Draw(label, color, name, found, gloss, ImGui.GetFrameHeight(), mouseWheel);
 }

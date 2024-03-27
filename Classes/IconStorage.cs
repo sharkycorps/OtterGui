@@ -1,67 +1,45 @@
-using System;
-using System.Collections.Generic;
-using Dalamud.Data;
 using Dalamud.Interface.Internal;
-using Dalamud.Logging;
-using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using Dalamud.Utility;
-using ImGuiScene;
-using Lumina.Data.Files;
 
 namespace OtterGui.Classes;
 
-public class IconStorage : IDisposable
+public class IconStorage(ITextureProvider textureProvider, IDataManager dataManager)
 {
-    private readonly DalamudPluginInterface        _pi;
-    private readonly IDataManager                   _gameData;
-    private readonly ITextureProvider               _textureProvider;
-    private readonly Dictionary<uint, IDalamudTextureWrap> _icons;
-
-    public IconStorage(DalamudPluginInterface pi, IDataManager gameData, ITextureProvider textureProvider, int size = 0)
-    {
-        _pi       = pi;
-        _gameData = gameData;
-        _textureProvider = textureProvider;
-        _icons    = new Dictionary<uint, IDalamudTextureWrap>(size);
-    }
-
-    private static string HqPath(uint id)
-        => $"ui/icon/{id / 1000 * 1000:000000}/{id:000000}_hr1.tex";
-
-    private static string NormalPath(uint id)
-        => $"ui/icon/{id / 1000 * 1000:000000}/{id:000000}.tex";
-
     public bool IconExists(uint id)
-        => _gameData.FileExists(HqPath(id)) || _gameData.FileExists(NormalPath(id));
+        => dataManager.FileExists(textureProvider.GetIconPath(id) ?? string.Empty)
+         || dataManager.FileExists(textureProvider.GetIconPath(id, ITextureProvider.IconFlags.None) ?? string.Empty);
 
-    public IDalamudTextureWrap this[int id]
-        => LoadIcon(id);
+    public IDalamudTextureWrap? this[int id]
+        => textureProvider.GetIcon((uint)id);
 
-    private TexFile? LoadIconHq(uint id)
-        => _gameData.GetFile<TexFile>(HqPath(id));
+    public IDalamudTextureWrap? this[uint id]
+        => textureProvider.GetIcon(id);
+        }
+        else
+        {
+            var iconData = icon.GetRgbaImageData();
 
-    public IDalamudTextureWrap LoadIcon(int id)
-        => LoadIcon((uint)id);  
+            ret = _pi.UiBuilder.LoadImageRaw(iconData, icon.Header.Width, icon.Header.Height, 4);
+        }
 
-    public IDalamudTextureWrap LoadIcon(uint id)
-    {
-        if (_icons.TryGetValue(id, out var ret))
-            return ret;
+        _icons[id] = ret;
+        return ret;
+    }
+        }
+        else
+        {
+            var iconData = icon.GetRgbaImageData();
 
-        ret = _textureProvider.GetIcon(id);
+            ret = _pi.UiBuilder.LoadImageRaw(iconData, icon.Header.Width, icon.Header.Height, 4);
+        }
 
         _icons[id] = ret;
         return ret;
     }
 
-    public void Dispose()
-    {
-        foreach (var icon in _icons.Values)
-            icon.Dispose();
-        _icons.Clear();
-    }
+    public IDalamudTextureWrap? LoadIcon(int id)
+        => textureProvider.GetIcon((uint)id);
 
-    ~IconStorage()
-        => Dispose();
+    public IDalamudTextureWrap? LoadIcon(uint id)
+        => textureProvider.GetIcon(id);
 }

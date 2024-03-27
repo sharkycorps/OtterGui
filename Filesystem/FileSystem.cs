@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace OtterGui.Filesystem;
 
 public enum FileSystemChangeType
@@ -81,6 +78,16 @@ public partial class FileSystem<T> where T : class
 
         Changed?.Invoke(FileSystemChangeType.LeafAdded, leaf, null, parent);
         return (leaf, idx);
+    }
+
+    // Create a new leaf of name name with potential duplicate numbers, and with data data in parent.
+    // Returns the leaf and its index in parent.
+    public (Leaf, int) CreateDuplicateLeaf(Folder parent, string name, T data)
+    {
+        name = name.FixName();
+        while (Search(parent, name) > 0)
+            name = name.IncrementDuplicate();
+        return CreateLeaf(parent, name, data);
     }
 
     // Create a new folder of name name in parent.
@@ -186,6 +193,26 @@ public partial class FileSystem<T> where T : class
         }
     }
 
+    // Rename a child to newName or an appended duplicate version of it.
+    // Throws if child is Root.
+    public void RenameWithDuplicates(IPath child, string newName)
+    {
+        while (true)
+        {
+            switch (RenameChild((IWritePath)child, newName))
+            {
+                case Result.InvalidOperation: throw new Exception("Can not rename root directory.");
+                case Result.ItemExists:
+                    newName = newName.IncrementDuplicate();
+                    continue;
+                case Result.Success:
+                case Result.SuccessNothingDone:
+                    Changed?.Invoke(FileSystemChangeType.ObjectRenamed, child, child.Parent, child.Parent);
+                    return;
+            }
+        }
+    }
+
     // Delete a child from its parent.
     // Throws if child is Root.
     public void Delete(IPath child)
@@ -244,8 +271,9 @@ public partial class FileSystem<T> where T : class
             case Result.PartialSuccess:
                 Changed?.Invoke(FileSystemChangeType.PartialMerge, from, from, to);
                 return;
-            case Result.NoSuccess: 
-                throw new Exception($"Could not merge {from.FullName()} into {to.FullName()} because all children already existed in the target.");
+            case Result.NoSuccess:
+                throw new Exception(
+                    $"Could not merge {from.FullName()} into {to.FullName()} because all children already existed in the target.");
         }
     }
 }

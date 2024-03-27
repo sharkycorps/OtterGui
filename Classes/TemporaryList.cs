@@ -1,7 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace OtterGui.Classes;
 
 /// <summary>
@@ -36,6 +32,9 @@ public class TemporaryList<T> : ICachingList<T>
         if (!ReferenceEquals(_list, _items))
             _list = null;
     }
+
+    public bool IsInitialized
+        => _list != null;
 
     public T this[int index]
         => InitList()[index];

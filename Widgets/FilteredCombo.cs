@@ -1,43 +1,60 @@
-using System.Collections.Generic;
-using System.Numerics;
-using Dalamud.Interface;
 using Dalamud.Interface.Utility;
-using Dalamud.Logging;
 using ImGuiNET;
 using OtterGui.Classes;
+using OtterGui.Log;
 using OtterGui.Raii;
+using OtterGuiInternal;
 
 namespace OtterGui.Widgets;
 
+[Flags]
+public enum MouseWheelType : byte
+{
+    None       = 0,
+    Unmodified = 1,
+    Shift      = 2,
+    Control    = 4,
+    Alt        = 8,
+}
+
 public abstract class FilterComboBase<T>
 {
-    private readonly HashSet<uint> _popupState = new();
+    private readonly HashSet<uint> _popupState = [];
 
 
     public readonly IReadOnlyList<T> Items;
 
-    private LowerString _filter = LowerString.Empty;
+    private LowerString _filter      = LowerString.Empty;
+    private string[]    _filterParts = [];
 
-    protected        int? NewSelection;
-    private          int  _lastSelection = -1;
-    private          bool _filterDirty   = true;
-    private          bool _setScroll;
-    private          bool _closePopup;
-    private readonly bool _keepStorage;
+    protected readonly Logger         Log;
+    protected          bool           SearchByParts;
+    protected          int?           NewSelection;
+    private            int            _lastSelection = -1;
+    private            bool           _filterDirty   = true;
+    private            bool           _setScroll;
+    private            bool           _closePopup;
+    protected          MouseWheelType AllowMouseWheel { get; set; }
+    private readonly   bool           _keepStorage;
 
     private readonly List<int> _available;
 
-    protected FilterComboBase(IReadOnlyList<T> items, bool keepStorage)
+    public LowerString Filter
+        => _filter;
+
+    protected FilterComboBase(IReadOnlyList<T> items, bool keepStorage, Logger log)
     {
         Items        = items;
         _keepStorage = keepStorage;
-        _available   = _keepStorage ? new List<int>(Items.Count) : new List<int>();
+        Log          = log;
+        _available   = _keepStorage ? new List<int>(Items.Count) : [];
     }
 
     private void ClearStorage(string label)
     {
-        PluginLog.Verbose("Cleaning up Filter Combo Cache for {Label}.", label);
+        Log.Verbose("Cleaning up Filter Combo Cache for {Label}.", label);
         _filter        = LowerString.Empty;
+        _filterParts   = [];
         _lastSelection = -1;
         Cleanup();
 
@@ -50,7 +67,16 @@ public abstract class FilterComboBase<T>
     }
 
     protected virtual bool IsVisible(int globalIndex, LowerString filter)
-        => filter.IsContained(ToString(Items[globalIndex]));
+    {
+        if (!SearchByParts)
+            return filter.IsContained(ToString(Items[globalIndex]));
+
+        if (_filterParts.Length == 0)
+            return true;
+
+        var name = ToString(Items[globalIndex]).ToLowerInvariant();
+        return _filterParts.All(name.Contains);
+    }
 
     protected virtual string ToString(T obj)
         => obj?.ToString() ?? string.Empty;
@@ -66,13 +92,21 @@ public abstract class FilterComboBase<T>
     protected virtual void Cleanup()
     { }
 
+    protected virtual void PostCombo(float previewWidth)
+    { }
+
     protected virtual void DrawCombo(string label, string preview, string tooltip, int currentSelected, float previewWidth, float itemHeight,
         ImGuiComboFlags flags)
     {
+        var id = ImGui.GetID(label);
         ImGui.SetNextItemWidth(previewWidth);
-        var       id    = ImGui.GetID(label);
         using var combo = ImRaii.Combo(label, preview, flags | ImGuiComboFlags.HeightLarge);
-        ImGuiUtil.HoverTooltip(tooltip);
+        PostCombo(previewWidth);
+        using (var dis = ImRaii.Enabled())
+        {
+            ImGuiUtil.HoverTooltip(tooltip, ImGuiHoveredFlags.AllowWhenDisabled);
+        }
+
         if (combo)
         {
             _popupState.Add(id);
@@ -113,7 +147,12 @@ public abstract class FilterComboBase<T>
 
         // Draw the text input.
         ImGui.SetNextItemWidth(width);
-        _filterDirty |= LowerString.InputWithHint("##filter", "Filter...", ref _filter);
+        if (LowerString.InputWithHint("##filter", "Filter...", ref _filter))
+        {
+            _filterDirty = true;
+            if (SearchByParts)
+                _filterParts = _filter.Lower.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        }
     }
 
     protected virtual void DrawList(float width, float itemHeight)
@@ -174,6 +213,12 @@ public abstract class FilterComboBase<T>
         }
     }
 
+    protected virtual void OnClosePopup()
+    { }
+
+    protected virtual void OnMouseWheel(string preview, ref int currentSelection, int steps)
+    { }
+
     protected void ClosePopup(uint id, string label)
     {
         if (!_closePopup)
@@ -182,6 +227,7 @@ public abstract class FilterComboBase<T>
         // Close the popup and reset state.
         ImGui.CloseCurrentPopup();
         _popupState.Remove(id);
+        OnClosePopup();
         ClearStorage(label);
     }
 
@@ -190,6 +236,14 @@ public abstract class FilterComboBase<T>
         ImGuiComboFlags flags = ImGuiComboFlags.None)
     {
         DrawCombo(label, preview, tooltip, currentSelection, previewWidth, itemHeight, flags);
+        if (CheckMouseWheel(AllowMouseWheel) && ImGui.IsItemHovered())
+        {
+            ImGuiInternal.ItemSetUsingMouseWheel();
+            var mw = (int)ImGui.GetIO().MouseWheel;
+            if (mw != 0)
+                OnMouseWheel(preview, ref currentSelection, mw);
+        }
+
         if (NewSelection == null)
             return false;
 
@@ -224,4 +278,22 @@ public abstract class FilterComboBase<T>
             _available.Add(idx);
         }
     }
+
+    // Check Mousewheel and modifiers,
+    private static bool CheckMouseWheel(MouseWheelType type)
+        => type switch
+        {
+            MouseWheelType.None                           => false,
+            MouseWheelType.Unmodified                     => true,
+            MouseWheelType.Shift                          => ImGui.GetIO().KeyShift,
+            MouseWheelType.Control                        => ImGui.GetIO().KeyCtrl,
+            MouseWheelType.Alt                            => ImGui.GetIO().KeyAlt,
+            MouseWheelType.Shift | MouseWheelType.Control => ImGui.GetIO().KeyShift && ImGui.GetIO().KeyCtrl,
+            MouseWheelType.Shift | MouseWheelType.Alt     => ImGui.GetIO().KeyShift && ImGui.GetIO().KeyAlt,
+            MouseWheelType.Control | MouseWheelType.Alt   => ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyAlt,
+            MouseWheelType.Shift | MouseWheelType.Control | MouseWheelType.Alt => ImGui.GetIO().KeyShift
+             && ImGui.GetIO().KeyCtrl
+             && ImGui.GetIO().KeyAlt,
+            _ => true,
+        };
 }

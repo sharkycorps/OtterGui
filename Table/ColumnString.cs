@@ -1,7 +1,4 @@
-using System;
-using System.Text.RegularExpressions;
-using Dalamud.Interface;
-using Dalamud.Logging;
+using Dalamud.Interface.Utility;
 using ImGuiNET;
 
 namespace OtterGui.Table;
@@ -44,18 +41,10 @@ public class ColumnString<TItem> : Column<TItem>
 
     public override bool FilterFunc(TItem item)
     {
-        var name = ToName(item);
         if (FilterValue.Length == 0)
             return true;
 
-        try
-        {
-            FilterRegex = new Regex(FilterValue, RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        }
-        catch
-        {
-            FilterRegex = null;
-        }
+        var name = ToName(item);
         return FilterRegex?.IsMatch(name) ?? name.Contains(FilterValue, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -63,9 +52,4 @@ public class ColumnString<TItem> : Column<TItem>
     {
         ImGui.TextUnformatted(ToName(item));
     }
-
-    public virtual event EventHandler<TItem>? OnContextMenuRequest;
-
-    public void InvokeContextMenu(TItem e)
-        => OnContextMenuRequest?.Invoke(this, e);
 }

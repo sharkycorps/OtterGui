@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
 using ImGuiNET;
 using OtterGui.Filesystem;
 using OtterGui.Raii;
@@ -172,7 +168,7 @@ public partial class FileSystemSelector<T, TStateStorage> : IDisposable
         if (_leafCount == 1 && _singleLeaf! != SelectedLeaf)
         {
             _filterDirty = ExpandAncestors(_singleLeaf!);
-            Select(_singleLeaf, GetState(_singleLeaf!));
+            Select(_singleLeaf, AllowMultipleSelection, GetState(_singleLeaf!));
         }
         else
         {
@@ -243,9 +239,12 @@ public partial class FileSystemSelector<T, TStateStorage> : IDisposable
                     SetFilterDirty();
                 });
                 break;
-            case FileSystemChangeType.ObjectRemoved when changedObject == SelectedLeaf:
+            case FileSystemChangeType.ObjectRemoved:
             case FileSystemChangeType.Reload:
-                ClearSelection();
+                if (changedObject == SelectedLeaf)
+                    ClearSelection();
+                else if (AllowMultipleSelection)
+                    _selectedPaths.Remove(changedObject);
                 SetFilterDirty();
                 break;
             default:

@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Runtime.CompilerServices;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Internal;
+using Dalamud.Interface.Utility;
 using ImGuiNET;
 using OtterGui.Raii;
 
@@ -65,6 +61,18 @@ public static partial class ImGuiUtil
         }
     }
 
+    /// <summary> InputInt for ulong. </summary>
+    public static unsafe bool InputUlong(string label, ref ulong value, string format = "%llu",
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+    {
+        var v = value;
+        if (!ImGui.InputScalar(label, ImGuiDataType.U64, (nint)(&v), nint.Zero, nint.Zero, format, flags) || v == value)
+            return false;
+
+        value = v;
+        return true;
+    }
+
     // Print unformatted text wrapped.
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     public static void TextWrapped(string text)
@@ -99,7 +107,8 @@ public static partial class ImGuiUtil
     }
 
     // Draw the same text multiple times to simulate a shadowed text.
-    public static void TextShadowed(ImDrawListPtr drawList, Vector2 position, string text, uint foregroundColor, uint shadowColor, byte shadowWidth = 1)
+    public static void TextShadowed(ImDrawListPtr drawList, Vector2 position, string text, uint foregroundColor, uint shadowColor,
+        byte shadowWidth = 1)
     {
         for (var i = -shadowWidth; i <= shadowWidth; i++)
         {
@@ -156,16 +165,29 @@ public static partial class ImGuiUtil
         TextColored(color, text);
     }
 
-    // Create a selectable that copies its text to clipboard when clicked.
+    // Create a selectable that copies a text to clipboard when clicked.
     // Also adds a tooltip on hover.
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-    public static void CopyOnClickSelectable(string text)
+    public static void CopyOnClickSelectable(string text, string copiedText, string tooltip)
     {
         if (ImGui.Selectable(text))
-            ImGui.SetClipboardText(text);
+        {
+            try
+            {
+                ImGui.SetClipboardText(copiedText);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
 
-        HoverTooltip("Click to copy to clipboard.");
+        HoverTooltip(tooltip);
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+    public static void CopyOnClickSelectable(string text)
+        => CopyOnClickSelectable(text, text, "Click to copy to clipboard.");
 
     // Draw a single FontAwesomeIcon.
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
@@ -183,6 +205,25 @@ public static partial class ImGuiUtil
         ImGui.SameLine();
         ImGui.TextUnformatted(label);
         HoverTooltip(tooltip);
+    }
+
+    // Draw a help marker on a selectable, typically for combo box items.
+    [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+    public static void SelectableHelpMarker(string tooltip)
+    {
+        var hovered = ImGui.IsItemHovered();
+        ImGui.SameLine();
+        using (var _ = ImRaii.PushFont(UiBuilder.IconFont))
+        {
+            using var color = ImRaii.PushColor(ImGuiCol.Text, ImGui.GetColorU32(ImGuiCol.TextDisabled));
+            RightAlign(FontAwesomeIcon.InfoCircle.ToIconString(), ImGui.GetStyle().ItemSpacing.X);
+        }
+
+        if (hovered)
+        {
+            using var tt = ImRaii.Tooltip();
+            ImGui.TextUnformatted(tooltip);
+        }
     }
 
     // Drag between min and max with the given speed and format.
@@ -339,6 +380,14 @@ public static partial class ImGuiUtil
         ImGui.TextUnformatted(text);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+    public static void DrawFrameColumn(string text)
+    {
+        ImGui.TableNextColumn();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(text);
+    }
+
     public static bool DrawEditButtonText(int id, string current, out string newText, ref bool edit, Vector2 buttonSize, float inputWidth,
         uint maxLength = 256)
     {
@@ -373,12 +422,19 @@ public static partial class ImGuiUtil
 
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     public static void HoverIcon(IDalamudTextureWrap icon, Vector2 iconSize)
+        => HoverIcon(icon.ImGuiHandle, icon.Size, iconSize);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+    public static void HoverIcon(nint ptr, Vector2 contentSize, Vector2 iconSize)
     {
-        ImGui.Image(icon.ImGuiHandle, iconSize);
-        HoverIconTooltip(icon, iconSize);
+        ImGui.Image(ptr, iconSize);
+        HoverIconTooltip(ptr, iconSize, contentSize);
     }
 
     public static void HoverIconTooltip(IDalamudTextureWrap icon, Vector2 iconSize)
+        => HoverIconTooltip(icon, iconSize, string.Empty);
+
+    public static void HoverIconTooltip(IDalamudTextureWrap icon, Vector2 iconSize, string text)
     {
         var size = new Vector2(icon.Width, icon.Height);
         if (iconSize.X > size.X || iconSize.Y > size.Y || !ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
@@ -387,6 +443,19 @@ public static partial class ImGuiUtil
         using var enable = ImRaii.Enabled();
         ImGui.BeginTooltip();
         ImGui.Image(icon.ImGuiHandle, size);
+        if (text.Length > 0)
+            ImGui.TextUnformatted(text);
+        ImGui.EndTooltip();
+    }
+
+    public static void HoverIconTooltip(nint icon, Vector2 iconSize, Vector2 size)
+    {
+        if (iconSize.X > size.X || iconSize.Y > size.Y || !ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            return;
+
+        using var enable = ImRaii.Enabled();
+        ImGui.BeginTooltip();
+        ImGui.Image(icon, size);
         ImGui.EndTooltip();
     }
 
@@ -465,16 +534,59 @@ public static partial class ImGuiUtil
         }
     }
 
-    /// <summary>
-    /// Computes the intensity of a RGB color without taking into consideration alpha values.
-    /// </summary>
-    public static byte ColorIntensity(uint color)
-    {
-        color = 1 + (color & 0xFF) + ((color >> 8) & 0xFF) + ((color >> 16) & 0xFF);
-        return (byte)(color / 3);
-    }
+    /// <inheritdoc cref="ColorIntensity(Vector4)"/>
+    public static float ColorIntensity(uint color)
+        => ColorIntensity(ColorHelpers.RgbaUintToVector4(color));
+
+    /// <inheritdoc cref="ColorIntensity(Vector4)"/>
+    public static float ColorIntensity(Vector3 color)
+        => ColorIntensity(new Vector4(color, 0));
+
+    /// <summary> Computes the intensity of an RGB color without taking into consideration alpha values. </summary>
+    public static float ColorIntensity(Vector4 color)
+        => 2 * color.X * color.X + 7 * color.Y * color.Y + color.Z * color.Z;
+
+    /// <summary> Obtain the better choice of black and white regarding contrast for a color. </summary>
+    public static uint ContrastColorBw(uint color)
+        => ColorIntensity(color) >= 4 ? 0xFF000000 : 0xFFFFFFFF;
+
+    /// <summary> Obtain the better choice of black and white regarding contrast for a color. </summary>
+    public static Vector3 ContrastColorBw(Vector3 color)
+        => ColorIntensity(color) >= 4 ? Vector3.Zero : Vector3.One;
+
+    /// <summary> Obtain the better choice of black and white regarding contrast for a color. </summary>
+    public static Vector4 ContrastColorBw(Vector4 color)
+        => ColorIntensity(color) >= 4 ? new Vector4(0, 0, 0, color.W) : new Vector4(1, 1, 1, color.W);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     public static unsafe bool IsDropping(string name)
         => ImGui.AcceptDragDropPayload(name).NativePtr != null;
+
+    /// <summary> Make a single-button color picker with a contrasted letter centered on it. </summary>
+    public static bool ColorPicker(string label, string tooltip, Vector3 input, Action<Vector3> setter, string letter = "")
+    {
+        var ret = false;
+        if (ImGui.ColorEdit3(label, ref input,
+                ImGuiColorEditFlags.NoInputs
+              | ImGuiColorEditFlags.DisplayRGB
+              | ImGuiColorEditFlags.InputRGB
+              | ImGuiColorEditFlags.NoTooltip
+              | ImGuiColorEditFlags.HDR))
+        {
+            setter(input);
+            ret = true;
+        }
+
+        if (letter.Length > 0 && ImGui.IsItemVisible())
+        {
+            var textSize  = ImGui.CalcTextSize(letter);
+            var center    = ImGui.GetItemRectMin() + (ImGui.GetItemRectSize() - textSize) / 2;
+            var textColor = ContrastColorBw(new Vector4(input, 0.7f));
+            ImGui.GetWindowDrawList().AddText(center, ImGui.ColorConvertFloat4ToU32(textColor), letter);
+        }
+
+        HoverTooltip(tooltip);
+
+        return ret;
+    }
 }

@@ -1,10 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using OtterGui.Raii;
@@ -34,27 +28,31 @@ public sealed class Changelog : Window
     public const int FreshInstallVersion = int.MaxValue;
 
     public const uint DefaultHeaderColor    = 0xFF60D0D0;
-    public const uint DefaultHighlightColor = 0xFF6060FF;
+    public const uint DefaultImportantColor = 0xFF6060FF;
+    public const uint DefaultHighlightColor = 0xFFFF9090;
 
     private readonly Func<(int, ChangeLogDisplayType)> _getConfig;
     private readonly Action<int, ChangeLogDisplayType> _setConfig;
 
     private readonly List<(string Title, List<Entry> Entries, bool HasHighlight)> _entries = new();
 
-    private int                  _lastVersion;
-    private ChangeLogDisplayType _displayType;
+    private          int                  _lastVersion;
+    private          ChangeLogDisplayType _displayType;
+    private readonly string               _headerName;
 
     public uint HeaderColor { get; set; } = DefaultHeaderColor;
     public bool ForceOpen   { get; set; } = false;
 
     public Changelog(string label, Func<(int, ChangeLogDisplayType)> getConfig, Action<int, ChangeLogDisplayType> setConfig)
-        : base(label, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize, true)
+        : base(label, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize, true)
     {
-        _getConfig         = getConfig;
-        _setConfig         = setConfig;
-        Position           = null;
-        RespectCloseHotkey = false;
-        ShowCloseButton    = false;
+        _headerName         = label.Split().FirstOrDefault(string.Empty);
+        _getConfig          = getConfig;
+        _setConfig          = setConfig;
+        Position            = null;
+        RespectCloseHotkey  = false;
+        ShowCloseButton     = false;
+        DisableWindowSounds = true;
     }
 
     public override void PreOpenCheck()
@@ -118,6 +116,9 @@ public sealed class Changelog : Window
         var i = 0;
         foreach (var ((name, list, hasHighlight), idx) in _entries.WithIndex().Reverse())
         {
+            if (name.Length == 0)
+                continue;
+
             using var id    = ImRaii.PushId(i++);
             using var color = ImRaii.PushColor(ImGuiCol.Text, HeaderColor);
             var       flags = ImGuiTreeNodeFlags.NoTreePushOnOpen;
@@ -133,7 +134,7 @@ public sealed class Changelog : Window
                 flags |= ImGuiTreeNodeFlags.DefaultOpen;
 
             var tree = ImGui.TreeNodeEx(name, flags);
-            CopyToClipboard(name, list);
+            CopyToClipboard(_headerName, name, list);
             color.Pop();
             if (!tree)
                 continue;
@@ -173,18 +174,23 @@ public sealed class Changelog : Window
         return this;
     }
 
-    public Changelog RegisterHighlight(string text, ushort level = 0, uint color = DefaultHighlightColor)
+    public Changelog RegisterImportant(string text, ushort level = 0, uint color = DefaultImportantColor)
     {
         var lastEntry = _entries.Last();
         lastEntry.Entries.Add(new Entry(text, color, level));
-        if (color != 0)
-            _entries[^1] = lastEntry with { HasHighlight = true };
+        _entries[^1] = lastEntry with { HasHighlight = true };
         return this;
     }
 
     public Changelog RegisterEntry(string text, ushort level = 0)
     {
         _entries.Last().Entries.Add(new Entry(text, 0, level));
+        return this;
+    }
+
+    public Changelog RegisterHighlight(string text, ushort level = 0, uint color = DefaultHighlightColor)
+    {
+        _entries.Last().Entries.Add(new Entry(text, color, level));
         return this;
     }
 
@@ -213,17 +219,14 @@ public sealed class Changelog : Window
 
         public void Append(StringBuilder sb)
         {
-            sb.Append("> ");
-            if (SubText > 0)
-                sb.Append('`');
             for (var i = 0; i < SubText; ++i)
-                sb.Append("    ");
-            if (SubText > 0)
-                sb.Append('`');
+                sb.Append("  ");
+
+            sb.Append("- ");
             if (Color != 0)
                 sb.Append("**");
-            sb.Append("- ")
-                .Append(Text);
+
+            sb.Append(Text);
             if (Color != 0)
                 sb.Append("**");
 
@@ -232,7 +235,7 @@ public sealed class Changelog : Window
     }
 
     [Conditional("DEBUG")]
-    private static void CopyToClipboard(string name, List<Entry> entries)
+    private static void CopyToClipboard(string label, string name, List<Entry> entries)
     {
         try
         {
@@ -240,11 +243,14 @@ public sealed class Changelog : Window
                 return;
 
             var sb = new StringBuilder(1024 * 64);
-            sb.Append("**")
+            if (label.Length > 0)
+                sb.Append("# ").Append(label).Append('\n');
+
+            sb.Append("## ")
                 .Append(name)
                 .Append(" notes, Update <t:")
                 .Append(DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-                .Append(">**\n");
+                .Append(">\n");
 
             foreach (var entry in entries)
                 entry.Append(sb);

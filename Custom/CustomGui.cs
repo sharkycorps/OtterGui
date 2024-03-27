@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.Numerics;
 using Dalamud.Interface.Internal.Notifications;
 using ImGuiNET;
 using OtterGui.Classes;
@@ -15,35 +13,31 @@ public static class CustomGui
     public const uint ReniColorActive  = 0xFF9070E0;
 
     /// <summary> Draw a button to open the official discord server. </summary>
-    public static void DrawDiscordButton(ChatService chat, float width)
+    public static void DrawDiscordButton(MessageService message, float width)
     {
         const string address = @"https://discord.gg/kVva7DHV4r";
         using var    color   = ImRaii.PushColor(ImGuiCol.Button, DiscordColor);
-        if (ImGui.Button("Join Discord for Support", new Vector2(width, 0)))
-            try
-            {
-                var process = new ProcessStartInfo(address)
-                {
-                    UseShellExecute = true,
-                };
-                Process.Start(process);
-            }
-            catch
-            {
-                chat.NotificationMessage($"Unable to open Discord at {address}.", "Error", NotificationType.Error);
-            }
 
-        ImGuiUtil.HoverTooltip($"Open {address}");
+        DrawLinkButton(message, "Join Discord for Support", address, width, $"Open {address}");
     }
 
     /// <summary> Draw the button that opens the ReniGuide. </summary>
-    public static void DrawGuideButton(ChatService chat, float width)
+    public static void DrawGuideButton(MessageService message, float width)
     {
         const string address = @"https://reniguide.info/";
         using var color = ImRaii.PushColor(ImGuiCol.Button, ReniColorButton)
             .Push(ImGuiCol.ButtonHovered, ReniColorHovered)
             .Push(ImGuiCol.ButtonActive,  ReniColorActive);
-        if (ImGui.Button("Beginner's Guides", new Vector2(width, 0)))
+
+        DrawLinkButton(message, "Beginner's Guides", address, width,
+            $"Open {address}\nImage and text based guides for most functionality of Penumbra made by Serenity.\n"
+          + "Not directly affiliated and potentially, but not usually out of date.");
+    }
+
+    /// <summary> Draw a button that opens an address in the browser. </summary>
+    public static void DrawLinkButton(MessageService message, string text, string address, float width, string? tooltip = null)
+    {
+        if (ImGui.Button(text, new Vector2(width, 0)))
             try
             {
                 var process = new ProcessStartInfo(address)
@@ -54,12 +48,10 @@ public static class CustomGui
             }
             catch
             {
-                chat.NotificationMessage($"Could not open guide at {address} in external browser.", "Error",
-                    NotificationType.Error);
+                message.NotificationMessage($"Could not open {text} at {address} in external browser", NotificationType.Error);
             }
 
-        ImGuiUtil.HoverTooltip(
-            $"Open {address}\nImage and text based guides for most functionality of Penumbra made by Serenity.\n"
-          + "Not directly affiliated and potentially, but not usually out of date.");
+        if (tooltip != null)
+            ImGuiUtil.HoverTooltip(tooltip);
     }
 }

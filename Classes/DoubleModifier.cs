@@ -1,4 +1,3 @@
-using System;
 using Dalamud.Game.ClientState.Keys;
 using Newtonsoft.Json;
 
@@ -25,6 +24,10 @@ public struct DoubleModifier : IEquatable<DoubleModifier>
         SetModifier1(modifier1);
         SetModifier2(modifier2);
     }
+
+    /// <summary> Use either this modifier or a default value if it is set to empty. </summary>
+    public DoubleModifier ForcedModifier(DoubleModifier defaultValue)
+        => Modifier1 == ModifierHotkey.NoKey ? defaultValue : this;
 
     // Try to set the first modifier.
     // If the modifier is empty, the second modifier will be reset.
