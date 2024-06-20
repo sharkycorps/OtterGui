@@ -182,7 +182,7 @@ public class ItemSelector<T>
 
 
     // Customization points.
-    protected virtual bool OnDraw(int idx)
+    protected virtual bool OnDraw(int idx, out bool changes)
         => throw new NotImplementedException();
 
     protected virtual bool Filtered(int idx)
@@ -206,8 +206,9 @@ public class ItemSelector<T>
     protected virtual void OnDrop(object? data, int idx)
         => throw new NotImplementedException();
 
-    public virtual event EventHandler<bool> ItemAdded;
-    public virtual event EventHandler<bool> ItemDeleted;
+    public event EventHandler<bool> ItemAdded;
+    public event EventHandler<bool> ItemDeleted;
+    public event EventHandler<bool> ItemSkipTriggered;
 
     private void InternalDraw(int idx)
     {
@@ -215,12 +216,16 @@ public class ItemSelector<T>
         // Add a slight distance from the border so that the padding of a selectable fills the whole border.
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ImGui.GetStyle().FramePadding.X);
 
-
         // Assume that OnDraw functions like a Selectable, if it returns true, select the value.
-        if (OnDraw(idx) && idx != CurrentIdx)
+        if (OnDraw(idx, out bool changes) && idx != CurrentIdx)
         {
             CurrentIdx = idx;
             Current    = Items[idx];
+        }
+
+        if (changes)
+        {
+            ItemSkipTriggered.Invoke(this, changes);
         }
 
         // If the ItemSelector supports Move, every item is a Move-DragDropSource. The data is the index of the dragged element.
