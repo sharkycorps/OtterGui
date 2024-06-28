@@ -1,7 +1,7 @@
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
-using Dalamud.Interface.Internal.Notifications;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin.Services;
 using ImGuiNET;
@@ -127,6 +127,7 @@ public class MessageService(Logger log, UiBuilder uiBuilder, IChatGui chat, INot
                 Content         = message.NotificationMessage,
                 Title           = message.NotificationTitle,
                 Type            = message.NotificationType,
+                Minimized       = false,
                 InitialDuration = TimeSpan.FromMilliseconds(message.NotificationDuration),
             });
 
