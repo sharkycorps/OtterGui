@@ -1,20 +1,19 @@
 ﻿using Dalamud.Interface.Textures;
-using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Plugin.Services;
 
 namespace OtterGui.Classes;
 
-public class TextureCache(IDataManager dataManager, ITextureProvider textureProvider)
+public class TextureCache(IDataManager dataManager, ITextureProvider textureProvider, IPluginLog log)
 {
-    public readonly IDataManager     DataManager     = dataManager;
+    public readonly IDataManager DataManager = dataManager;
     public readonly ITextureProvider TextureProvider = textureProvider;
+    public readonly IPluginLog Log = log;
 
     public IDalamudTextureWrap? LoadIcon(uint iconId)
     {
         var icon = TextureProvider.GetFromGameIcon(new GameIconLookup(iconId));
         if (!icon.TryGetWrap(out var wrap, out _))
             return null;
-
         return wrap;
     }
 
@@ -28,6 +27,12 @@ public class TextureCache(IDataManager dataManager, ITextureProvider textureProv
             return null;
 
         return wrap;
+    }
+
+    public async Task<IDalamudTextureWrap> TryLoadIconAsync(uint iconid)
+    {
+        var icon = await TextureProvider.GetFromGameIcon(new GameIconLookup(iconid)).RentAsync();
+        return icon;
     }
 
     public bool TryLoadIcon(uint iconId, [NotNullWhen(true)] out IDalamudTextureWrap? wrap)
